@@ -1,0 +1,125 @@
+{
+  "name": "console-log-janitor",
+  "displayName": "Console.log Janitor",
+  "description": "Detects development console.log statements and safely cleans them up using native VS Code diagnostics and quick-fixes.",
+  "version": "1.0.0",
+  "publisher": "ajkaarthick",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#161822",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AJ-Kaarthick/console-log-janitor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AJ-Kaarthick/console-log-janitor/issues"
+  },
+  "homepage": "https://github.com/AJ-Kaarthick/console-log-janitor",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "console.log",
+    "cleaner",
+    "janitor",
+    "linter",
+    "quickfix",
+    "code-action"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "consoleLogJanitor.scanCurrentFile",
+        "title": "Console.log Janitor: Scan Current File",
+        "category": "Console.log Janitor"
+      },
+      {
+        "command": "consoleLogJanitor.scanWorkspace",
+        "title": "Console.log Janitor: Scan Workspace",
+        "category": "Console.log Janitor"
+      },
+      {
+        "command": "consoleLogJanitor.removeCurrentFile",
+        "title": "Console.log Janitor: Remove console.log Statements from Current File",
+        "category": "Console.log Janitor"
+      },
+      {
+        "command": "consoleLogJanitor.clearDiagnostics",
+        "title": "Console.log Janitor: Clear Diagnostics",
+        "category": "Console.log Janitor"
+      }
+    ],
+    "configuration": {
+      "title": "Console.log Janitor",
+      "properties": {
+        "consoleLogJanitor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Console.log Janitor."
+        },
+        "consoleLogJanitor.scanOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan eligible files when opened."
+        },
+        "consoleLogJanitor.scanOnChange": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan eligible files when modified (debounced)."
+        },
+        "consoleLogJanitor.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan eligible files when saved."
+        },
+        "consoleLogJanitor.debounceDelayMs": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 50,
+          "maximum": 3000,
+          "description": "Debounce delay in milliseconds for scanning on document changes."
+        },
+        "consoleLogJanitor.severity": {
+          "type": "string",
+          "enum": [
+            "Information",
+            "Warning",
+            "Error",
+            "Hint"
+          ],
+          "default": "Information",
+          "description": "Diagnostic severity level for detected console.log statements."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "build:dev": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.1.8"
+  }
+}
