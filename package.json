@@ -1,8 +1,8 @@
 {
   "name": "console-log-janitor",
   "displayName": "Console.log Janitor",
-  "description": "Detects development console.log statements and safely cleans them up using native VS Code diagnostics and quick-fixes.",
-  "version": "1.0.0",
+  "description": "Detects development console.log statements and safely cleans them up with reviewable bulk actions and native VS Code Quick Fixes.",
+  "version": "1.1.0",
   "publisher": "ajkaarthick",
   "icon": "icon.png",
   "galleryBanner": {
@@ -55,6 +55,11 @@
       {
         "command": "consoleLogJanitor.removeCurrentFile",
         "title": "Console.log Janitor: Remove console.log Statements from Current File",
+        "category": "Console.log Janitor"
+      },
+      {
+        "command": "consoleLogJanitor.removeAllInWorkspace",
+        "title": "Console.log Janitor: Remove console.log Statements from Workspace",
         "category": "Console.log Janitor"
       },
       {

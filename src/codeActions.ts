@@ -5,7 +5,7 @@
 import * as vscode from "vscode";
 import { DIAGNOSTIC_CODE_REMOVE, DiagnosticsManager } from "./diagnostics";
 import { LineIndex } from "./scanner/lineIndex";
-import { computeIgnoreEdit, computeRemovalEdit } from "./remover";
+import { computeFileDisableEdit, computeIgnoreEdit, computeRemovalEdit } from "./remover";
 import { TextEditOperation } from "./scanner/types";
 
 export class ConsoleLogCodeActionProvider implements vscode.CodeActionProvider {
@@ -47,9 +47,10 @@ export class ConsoleLogCodeActionProvider implements vscode.CodeActionProvider {
       return actions;
     }
 
+    const unsuppressedTotal = matches.filter((m) => !m.isSuppressed).length;
     let firstRelatedDiag: vscode.Diagnostic | undefined;
 
-    // 1 & 2: Single-statement Remove and Ignore actions
+    // 1. Single-statement Remove and Ignore actions
     for (const match of intersectingMatches) {
       const relatedDiag = context.diagnostics.find(
         (d) =>
@@ -60,21 +61,25 @@ export class ConsoleLogCodeActionProvider implements vscode.CodeActionProvider {
         firstRelatedDiag = relatedDiag;
       }
 
-      // 1. Primary Quick-Fix: Remove console.log
-      const removeAction = new vscode.CodeAction(
-        "Remove console.log",
-        vscode.CodeActionKind.QuickFix
-      );
-      removeAction.isPreferred = true;
-      if (relatedDiag) {
-        removeAction.diagnostics = [relatedDiag];
-      }
-
+      // Compute removal edit
       const removeOp = computeRemovalEdit(source, match, lineIndex);
-      const removeEdit = new vscode.WorkspaceEdit();
-      removeEdit.set(document.uri, [this.toVscodeEdit(document, removeOp)]);
-      removeAction.edit = removeEdit;
-      actions.push(removeAction);
+
+      // Only offer removal action if context allowed safe transformation
+      if (removeOp.startOffset !== removeOp.endOffset || removeOp.newText !== "") {
+        const removeAction = new vscode.CodeAction(
+          "Remove console.log",
+          vscode.CodeActionKind.QuickFix
+        );
+        removeAction.isPreferred = true;
+        if (relatedDiag) {
+          removeAction.diagnostics = [relatedDiag];
+        }
+
+        const removeEdit = new vscode.WorkspaceEdit();
+        removeEdit.set(document.uri, [this.toVscodeEdit(document, removeOp)]);
+        removeAction.edit = removeEdit;
+        actions.push(removeAction);
+      }
 
       // 2. Quick-Fix: Ignore this console.log
       const ignoreAction = new vscode.CodeAction(
@@ -92,22 +97,38 @@ export class ConsoleLogCodeActionProvider implements vscode.CodeActionProvider {
       actions.push(ignoreAction);
     }
 
-    // 3. Bulk Action: Remove all console.log statements in this file
-    const removeAllFileAction = new vscode.CodeAction(
-      "Remove all console.log statements in this file",
+    // 3. Bulk Action: Only show "Remove all N in this file" when count > 1
+    if (unsuppressedTotal > 1) {
+      const removeAllFileAction = new vscode.CodeAction(
+        `Remove all ${unsuppressedTotal} console.log statements in this file`,
+        vscode.CodeActionKind.QuickFix
+      );
+      if (firstRelatedDiag) {
+        removeAllFileAction.diagnostics = [firstRelatedDiag];
+      }
+      removeAllFileAction.command = {
+        command: "consoleLogJanitor.removeAllInFile",
+        title: `Remove all ${unsuppressedTotal} console.log statements in this file`,
+        arguments: [document.uri],
+      };
+      actions.push(removeAllFileAction);
+    }
+
+    // 4. File-level Action: Disable Console.log Janitor for this file
+    const disableFileAction = new vscode.CodeAction(
+      "Disable Console.log Janitor for this file",
       vscode.CodeActionKind.QuickFix
     );
     if (firstRelatedDiag) {
-      removeAllFileAction.diagnostics = [firstRelatedDiag];
+      disableFileAction.diagnostics = [firstRelatedDiag];
     }
-    removeAllFileAction.command = {
-      command: "consoleLogJanitor.removeAllInFile",
-      title: "Remove all console.log statements in this file",
-      arguments: [document.uri],
-    };
-    actions.push(removeAllFileAction);
+    const disableOp = computeFileDisableEdit(source);
+    const disableEdit = new vscode.WorkspaceEdit();
+    disableEdit.set(document.uri, [this.toVscodeEdit(document, disableOp)]);
+    disableFileAction.edit = disableEdit;
+    actions.push(disableFileAction);
 
-    // 4. Bulk Action: Remove all console.log statements in the workspace
+    // 5. Bulk Action: Remove all console.log statements in the workspace
     const removeAllWorkspaceAction = new vscode.CodeAction(
       "Remove all console.log statements in the workspace",
       vscode.CodeActionKind.QuickFix

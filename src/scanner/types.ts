@@ -50,4 +50,10 @@ export interface ConsoleLogMatch {
 
   /** Whether the match is suppressed by a `// console-log-janitor-ignore` directive */
   isSuppressed: boolean;
+
+  /** Whether the match is in an unbraced control flow statement (if, else, while, for, do) */
+  isControlFlowBody?: boolean;
+
+  /** Whether the match is the concise body of an arrow function */
+  isArrowFunctionBody?: boolean;
 }

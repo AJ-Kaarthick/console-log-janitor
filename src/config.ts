@@ -26,6 +26,37 @@ export function isSupportedLanguage(languageId: string): boolean {
   return SUPPORTED_LANGUAGES.includes(languageId);
 }
 
+/**
+ * Checks whether a file path or URI is eligible for workspace scanning and cleanup.
+ * Automatically excludes declaration files, minified/bundled scripts, and excluded directories.
+ */
+export function isWorkspaceCleanableFile(pathOrUri: string | vscode.Uri): boolean {
+  const filePath = typeof pathOrUri === "string" ? pathOrUri : pathOrUri.fsPath || pathOrUri.path;
+  const normalized = filePath.replace(/\\/g, "/");
+
+  // Exclude directories
+  if (/(?:^|\/)(?:node_modules|\.git|dist|out|build|coverage)(?:\/|$)/.test(normalized)) {
+    return false;
+  }
+
+  // Exclude TypeScript declaration files (*.d.ts)
+  if (normalized.endsWith(".d.ts")) {
+    return false;
+  }
+
+  // Exclude minified files (*.min.js, *.min.ts, *.min.jsx, *.min.tsx)
+  if (/\.min\.[jt]sx?$/i.test(normalized)) {
+    return false;
+  }
+
+  // Exclude bundled files (*.bundle.js, *.bundle.ts, *.bundle.jsx, *.bundle.tsx)
+  if (/\.bundle\.[jt]sx?$/i.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
 export function getConfig(): ExtensionConfig {
   const config = vscode.workspace.getConfiguration("consoleLogJanitor");
 

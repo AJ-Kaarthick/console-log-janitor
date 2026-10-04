@@ -17,7 +17,7 @@ export class StatusBarManager {
       vscode.StatusBarAlignment.Right,
       100
     );
-    this.statusBarItem.command = "consoleLogJanitor.scanCurrentFile";
+    this.statusBarItem.command = "consoleLogJanitor.showStatusBarMenu";
   }
 
   public update(editor?: vscode.TextEditor): void {
@@ -35,7 +35,7 @@ export class StatusBarManager {
     this.statusBarItem.text = `$(output) ${count} console.log`;
     this.statusBarItem.tooltip = `Console.log Janitor: ${count} statement${
       count === 1 ? "" : "s"
-    } detected in active file. Click to re-scan.`;
+    } detected in active file. Click for actions.`;
 
     this.statusBarItem.show();
   }

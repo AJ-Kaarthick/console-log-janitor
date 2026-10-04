@@ -20,6 +20,11 @@ export enum StatusBarAlignment {
   Right = 2,
 }
 
+export enum QuickPickItemKind {
+  Separator = -1,
+  Default = 0,
+}
+
 export interface Command {
   title: string;
   command: string;
@@ -154,6 +159,7 @@ export const window = {
   showInformationMessage: async (...args: any[]): Promise<any> => undefined,
   showWarningMessage: async (...args: any[]): Promise<any> => undefined,
   showErrorMessage: async (...args: any[]): Promise<any> => undefined,
+  showQuickPick: async (items: any, options?: any): Promise<any> => undefined,
   createStatusBarItem: () => ({
     text: "",
     tooltip: "",
@@ -178,7 +184,29 @@ export const workspace = {
     return null;
   },
   findFiles: async (include: string, exclude?: string): Promise<Uri[]> => [],
-  applyEdit: async (edit: WorkspaceEdit): Promise<boolean> => true,
+  applyEdit: async (edit: WorkspaceEdit): Promise<boolean> => {
+    const entries = edit.entries();
+    for (const [, textEdits] of entries) {
+      const sorted = [...textEdits].sort((a, b) => {
+        if (a.range.start.line !== b.range.start.line) {
+          return a.range.start.line - b.range.start.line;
+        }
+        return a.range.start.character - b.range.start.character;
+      });
+
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const curEnd = sorted[i].range.end;
+        const nextStart = sorted[i + 1].range.start;
+        const isBefore =
+          nextStart.line < curEnd.line ||
+          (nextStart.line === curEnd.line && nextStart.character < curEnd.character);
+        if (isBefore) {
+          return false;
+        }
+      }
+    }
+    return true;
+  },
 };
 
 export const commands = {

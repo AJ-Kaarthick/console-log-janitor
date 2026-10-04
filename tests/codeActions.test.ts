@@ -61,7 +61,7 @@ describe("Diagnostics & Code Actions Provider", () => {
     expect(diagMgr.getMatches(doc.uri)).toHaveLength(0);
   });
 
-  it("provides single Remove, Ignore, File-level, and Workspace-level Code Actions for detected statement", () => {
+  it("provides contextual Quick Fixes for single finding without redundant file bulk action", () => {
     const code = `function run() {
   console.log("quick fix me");
 }`;
@@ -98,13 +98,10 @@ describe("Diagnostics & Code Actions Provider", () => {
     expect(ignoreAction).toBeDefined();
     expect(ignoreAction?.edit).toBeDefined();
 
-    // 3. Remove all console.log statements in this file
-    const fileAction = actions.find(
-      (a) => a.title === "Remove all console.log statements in this file"
-    );
-    expect(fileAction).toBeDefined();
-    expect(fileAction?.command?.command).toBe("consoleLogJanitor.removeAllInFile");
-    expect(fileAction?.command?.arguments).toEqual([doc.uri]);
+    // 3. Disable Console.log Janitor for this file
+    const disableAction = actions.find((a) => a.title === "Disable Console.log Janitor for this file");
+    expect(disableAction).toBeDefined();
+    expect(disableAction?.edit).toBeDefined();
 
     // 4. Remove all console.log statements in the workspace
     const workspaceAction = actions.find(
@@ -112,6 +109,45 @@ describe("Diagnostics & Code Actions Provider", () => {
     );
     expect(workspaceAction).toBeDefined();
     expect(workspaceAction?.command?.command).toBe("consoleLogJanitor.removeAllInWorkspace");
+
+    // Must NOT have redundant file action when count === 1
+    const redundantFileAction = actions.find((a) => a.title.includes("in this file") && a.title.includes("Remove all"));
+    expect(redundantFileAction).toBeUndefined();
+  });
+
+  it("provides contextual bulk action with count when multiple findings exist", () => {
+    const code = `function run() {
+  console.log("first");
+  console.log("second");
+}`;
+    const doc = createMockDocument(code);
+    const diagMgr = new DiagnosticsManager();
+    diagMgr.updateDiagnostics(doc);
+
+    const provider = new ConsoleLogCodeActionProvider(diagMgr);
+    const cursorRange = new vscode.Range(1, 4, 1, 15);
+    const context: vscode.CodeActionContext = {
+      diagnostics: [
+        new vscode.Diagnostic(
+          cursorRange,
+          DIAGNOSTIC_MESSAGE,
+          vscode.DiagnosticSeverity.Information
+        ),
+      ],
+      only: undefined,
+      triggerKind: 1 as unknown as vscode.CodeActionTriggerKind,
+    };
+
+    const actions = provider.provideCodeActions(doc, cursorRange, context);
+
+    expect(actions).toHaveLength(5);
+
+    const fileAction = actions.find(
+      (a) => a.title === "Remove all 2 console.log statements in this file"
+    );
+    expect(fileAction).toBeDefined();
+    expect(fileAction?.command?.command).toBe("consoleLogJanitor.removeAllInFile");
+    expect(fileAction?.command?.arguments).toEqual([doc.uri]);
   });
 
   it("does not provide actions when cursor is outside detected statements", () => {

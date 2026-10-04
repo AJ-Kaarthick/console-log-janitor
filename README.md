@@ -1,6 +1,6 @@
 # Console.log Janitor
 
-A lightweight, production-ready VS Code extension that automatically detects development `console.log` statements in JavaScript and TypeScript files and lets you safely remove them using native VS Code diagnostics and Code Actions (lightbulb quick-fixes).
+A lightweight, production-ready VS Code extension that automatically detects development `console.log` statements in JavaScript and TypeScript files and lets you safely remove them using native VS Code diagnostics, Quick Fixes, and reviewable bulk actions.
 
 ---
 
@@ -15,7 +15,7 @@ During active development and debugging, developers frequently insert `console.l
 ### The Old Workflow vs. The Janitor Workflow
 
 - **Before**: Manually run global text searches for `console.log`, wade through comments, strings, and variable names, click through each file, and manually select and delete lines.
-- **With Console.log Janitor**: As you write or open code, statements are highlighted with a native VS Code diagnostic squiggle. Hover to inspect, and click the lightbulb (**Quick Fix**) or press `Ctrl+.` / `Cmd+.` to remove the statement instantly.
+- **With Console.log Janitor**: As you write or open code, statements are highlighted with a native VS Code diagnostic squiggle. Hover to inspect, and click the lightbulb (**Quick Fix**) or press `Ctrl+.` / `Cmd+.` to remove statements individually or in bulk with preview confirmation.
 
 ---
 
@@ -39,28 +39,48 @@ The extension runs completely in the background without requiring manual interve
 
 ### 3. Native Lightbulb Code Actions (Quick Fix)
 
-Press `Cmd+.` (macOS) or `Ctrl+.` (Windows/Linux) on any highlighted statement to open the Quick Fix menu:
+Press `Cmd+.` (macOS) or `Ctrl+.` (Windows/Linux) on any highlighted statement to open the contextual Quick Fix menu:
 
-1. **Remove console.log** *(Preferred)*: Safely removes the full `console.log` statement. If the statement is on its own line, the entire line and indentation are removed so no empty blank lines remain. If surrounded by other code on the same line, the surrounding code is preserved intact.
-2. **Ignore this console.log**: Inserts a `// console-log-janitor-ignore` comment directly above the statement to suppress diagnostics for intentional logs.
-3. **Remove all console.log statements in this file**: Contextual file-level cleanup. Asks for explicit confirmation stating the exact count of statements to remove, then applies edits safely.
-4. **Remove all console.log statements in the workspace**: Contextual workspace-level cleanup. Scans all supported files across the workspace and asks for explicit confirmation stating the total statement count and affected file count before applying edits atomically.
+1. **Remove console.log** *(Preferred)*: Safely removes the full `console.log` statement.
+   - **Standalone line**: Entire line and indentation are removed, leaving no blank line.
+   - **Concise arrow function**: `() => console.log("x")` is safely replaced with `{}` (or `{};`), maintaining valid syntax and preventing runtime syntax errors.
+   - **Unbraced control flow**: Solitary body under `if`, `else`, `while`, `for`, or `do` is safely replaced with `{}` to prevent control-flow shifting and semantic bugs.
+   - **Inline code**: Surrounding code and indentation are preserved intact.
+   - **Conservative refusal**: If the surrounding syntactic context cannot be proven safe, automatic transformation is refused rather than guessed.
+2. **Ignore this console.log**: Inserts a `// console-log-janitor-ignore` comment directly above the statement.
+3. **Disable Console.log Janitor for this file**: Inserts `// console-log-janitor-disable` at the top of the file (preserving shebang `#!`), suppressing all diagnostics and cleanup for the file.
+4. **Remove all N console.log statements in this file**: Contextually available when multiple findings exist in the file (deduplicated when only 1 finding exists). Displays statement counts and requests confirmation before applying edits.
+5. **Remove all console.log statements in the workspace**: Scans eligible workspace files and opens a review dialog displaying statement counts, affected file counts, and statement previews before applying edits.
 
-### 4. Status Bar Indicator
+### 4. Reviewable Bulk Cleanup & Pre-Validation
+
+Bulk cleanup (both current-file and workspace-wide) provides a safe, reviewable workflow:
+- **Review Confirmation**: Displays total statement counts, affected file counts, and concise previews of affected code before any changes are made.
+- **Pre-Validation**: All edit ranges and boundaries are pre-validated to ensure target slices match and edit ranges are strictly disjoint.
+- **Cancel Protection**: Dismissing the prompt or selecting Cancel applies zero edits and leaves all files untouched. If edit validation fails, zero edits are applied.
+- **Disjoint Edit Reconciliation**: Multi-statement removals in the same file are reconciled so edits never overlap, ensuring clean application.
+
+### 5. Actionable Status Bar Hub
 
 A compact indicator in the status bar displays the count of detected `console.log` calls in the active file:
 ```
 $(output) 3 console.log
 ```
-Clicking the status bar item triggers an instant re-scan of the active file.
+Clicking the status bar item opens an instant action hub (zero disk scan delay):
+- **Remove all N console.log statements in this file** (contextual, shown when findings exist)
+- **Remove all console.log statements in workspace**
+- **Re-scan current file**
+- **Clear diagnostics**
+- **Open Settings**
 
-### 5. Manual Commands (Command Palette)
+### 6. Manual Commands (Command Palette)
 
-While the extension is designed around an automatic workflow, manual commands are available via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
+All actions are accessible via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 - `Console.log Janitor: Scan Current File` — Manually re-scans the active document.
-- `Console.log Janitor: Scan Workspace` — Scans all JS/TS files in the workspace with progress feedback.
-- `Console.log Janitor: Remove console.log Statements from Current File` — Removes all unsuppressed `console.log` statements in the active editor.
+- `Console.log Janitor: Scan Workspace` — Scans all eligible JS/TS files in the workspace with progress feedback.
+- `Console.log Janitor: Remove console.log Statements from Current File` — Removes all unsuppressed statements in the active editor with review confirmation.
+- `Console.log Janitor: Remove console.log Statements from Workspace` — Removes all unsuppressed statements across the workspace with review confirmation.
 - `Console.log Janitor: Clear Diagnostics` — Clears all diagnostics.
 
 ---
@@ -97,6 +117,16 @@ Console.log Janitor uses a token-aware scanner designed to detect valid `console
 - Properties on other objects: `myService.console.log(...)`
 - Unrelated methods: `console.error(...)`, `console.warn(...)`, `console.info(...)`
 - JSX text content between tags: `<div>console.log("text")</div>`
+- Calls suppressed with `// console-log-janitor-ignore`
+- Files disabled with `// console-log-janitor-disable` or `/* console-log-janitor-disable */`
+
+### Automatic Workspace Exclusions
+Workspace scanning and bulk cleanup automatically exclude:
+- TypeScript declaration files (`*.d.ts`)
+- Minified scripts (`*.min.js`, `*.min.ts`, `*.min.jsx`, `*.min.tsx`)
+- Bundled files (`*.bundle.js`, `*.bundle.ts`, `*.bundle.jsx`, `*.bundle.tsx`)
+- Test coverage directories (`coverage/**`)
+- Standard build and package folders: `node_modules`, `.git`, `dist`, `out`, `build`
 
 ---
 
@@ -110,7 +140,7 @@ Customize behavior in VS Code Settings (`settings.json`):
 | `consoleLogJanitor.scanOnOpen` | `boolean` | `true` | Automatically scan eligible files when opened. |
 | `consoleLogJanitor.scanOnChange` | `boolean` | `true` | Automatically scan eligible files as they are modified. |
 | `consoleLogJanitor.scanOnSave` | `boolean` | `true` | Automatically scan eligible files when saved. |
-| `consoleLogJanitor.debounceDelayMs` | `integer` | `300` | Debounce delay in milliseconds for typing change events (50–5000 ms). |
+| `consoleLogJanitor.debounceDelayMs` | `integer` | `300` | Debounce delay in milliseconds for typing change events (50–3000 ms). |
 | `consoleLogJanitor.severity` | `string` | `"Information"` | Diagnostic severity: `"Information"`, `"Warning"`, `"Error"`, or `"Hint"`. |
 
 ---
@@ -119,19 +149,19 @@ Customize behavior in VS Code Settings (`settings.json`):
 
 Console.log Janitor is designed for privacy-conscious developers and enterprise environments:
 
-- **100% Local**: Runs entirely within your local VS Code process.
+- **Local Execution**: Runs entirely within your local VS Code process.
 - **Zero Network Requests**: Makes no network, HTTP, or remote API calls.
 - **Zero Telemetry**: Collects no usage data, logs, or analytics.
 - **Zero External Services**: No third-party servers or AI APIs are contacted.
 - **Zero Shell Execution**: Does not spawn sub-shells or execute CLI binaries.
-- **Zero Automatic Modifications**: Never modifies files without explicit user action (e.g. clicking Quick Fix or invoking the manual command).
+- **Zero Automatic Modifications**: Never modifies files without explicit user action (e.g. selecting a Quick Fix or invoking a cleanup command).
 
 ---
 
 ## Installation
 
 ### From VSIX
-1. Download the `console-log-janitor-1.0.0.vsix` package.
+1. Download the `console-log-janitor-1.1.0.vsix` package.
 2. Open VS Code.
 3. Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
 4. Click the `...` (Views and More Actions) menu in the top right of the Extensions panel.
@@ -139,7 +169,7 @@ Console.log Janitor is designed for privacy-conscious developers and enterprise 
 
 Alternatively, install from the terminal:
 ```bash
-code --install-extension console-log-janitor-1.0.0.vsix
+code --install-extension console-log-janitor-1.1.0.vsix
 ```
 
 ---
@@ -169,8 +199,8 @@ npm run package
 
 ## Known Limitations
 
-- **Scope**: Version 1.0 focuses exclusively on `console.log` statements. It intentionally does not flag `console.error`, `console.warn`, `console.info`, or custom logging libraries (e.g. Winston, Pino).
-- **Complex AST Transformations**: In expressions where `console.log` is used as an inline return value (e.g. `() => console.log()`), removing the call removes the expression.
+- **Scope**: Focuses exclusively on `console.log` statements. It intentionally does not flag `console.error`, `console.warn`, `console.info`, or custom logging libraries (e.g. Winston, Pino).
+- **Conservative Safety Refusal**: When removing statements from unbraced control structures or concise arrow functions, the remover requires proven syntactic contexts. If the context is ambiguous, automatic transformation is refused to preserve code semantics.
 - **Language Scope**: Only JavaScript, TypeScript, JSX, and TSX files are scanned. Other languages (Python, Go, Java, PHP, etc.) are out of scope.
 
 ---

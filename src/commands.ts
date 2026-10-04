@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import { removeAllInFile, removeAllInWorkspace } from "./bulkCleaner";
-import { isSupportedLanguage } from "./config";
+import { isSupportedLanguage, isWorkspaceCleanableFile } from "./config";
 import { DiagnosticsManager } from "./diagnostics";
 import { StatusBarManager } from "./statusBar";
 
@@ -46,10 +46,12 @@ export function registerCommands(
   // 2. Scan Workspace
   context.subscriptions.push(
     vscode.commands.registerCommand("consoleLogJanitor.scanWorkspace", async () => {
-      const files = await vscode.workspace.findFiles(
+      const rawFiles = await vscode.workspace.findFiles(
         "**/*.{js,ts,jsx,tsx}",
-        "**/{node_modules,.git,dist,out,build}/**"
+        "**/{node_modules,.git,dist,out,build,coverage}/**"
       );
+
+      const files = rawFiles.filter((f) => isWorkspaceCleanableFile(f));
 
       if (files.length === 0) {
         vscode.window.showInformationMessage("Console.log Janitor: No JavaScript/TypeScript files found in workspace.");
@@ -136,6 +138,76 @@ export function registerCommands(
       diagnosticsManager.clearAll();
       statusBarManager.update();
       vscode.window.showInformationMessage("Console.log Janitor: Diagnostics cleared.");
+    })
+  );
+
+  // 7. Status Bar Action Menu (instant, zero disk scan)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("consoleLogJanitor.showStatusBarMenu", async () => {
+      const editor = vscode.window.activeTextEditor;
+      let activeFileCount = 0;
+
+      if (editor && isSupportedLanguage(editor.document.languageId)) {
+        const matches = diagnosticsManager.getMatches(editor.document.uri);
+        activeFileCount = matches.filter((m) => !m.isSuppressed).length;
+      }
+
+      interface StatusMenuItem extends vscode.QuickPickItem {
+        commandId: string;
+      }
+
+      const items: StatusMenuItem[] = [];
+
+      if (activeFileCount === 1) {
+        items.push({
+          label: "$(trash) Remove console.log in this file",
+          description: "Clean active file",
+          commandId: "consoleLogJanitor.removeCurrentFile",
+        });
+      } else if (activeFileCount > 1) {
+        items.push({
+          label: `$(trash) Remove all ${activeFileCount} console.log statements in this file`,
+          description: "Clean active file",
+          commandId: "consoleLogJanitor.removeCurrentFile",
+        });
+      }
+
+      items.push({
+        label: "$(globe) Remove console.log statements in workspace",
+        description: "Review and clean across workspace files",
+        commandId: "consoleLogJanitor.removeAllInWorkspace",
+      });
+
+      items.push({
+        label: "$(refresh) Re-scan current file",
+        description: "Re-scan the active document for console.log statements",
+        commandId: "consoleLogJanitor.scanCurrentFile",
+      });
+
+      items.push({
+        label: "$(clear-all) Clear diagnostics",
+        description: "Clear all problem markers",
+        commandId: "consoleLogJanitor.clearDiagnostics",
+      });
+
+      items.push({
+        label: "$(gear) Open Settings",
+        description: "Open Console.log Janitor configuration",
+        commandId: "workbench.action.openSettings",
+      });
+
+      const selected = await vscode.window.showQuickPick(items, {
+        title: "Console.log Janitor",
+        placeHolder: "Select a Janitor action:",
+      });
+
+      if (selected) {
+        if (selected.commandId === "workbench.action.openSettings") {
+          await vscode.commands.executeCommand("workbench.action.openSettings", "consoleLogJanitor");
+        } else {
+          await vscode.commands.executeCommand(selected.commandId);
+        }
+      }
     })
   );
 }

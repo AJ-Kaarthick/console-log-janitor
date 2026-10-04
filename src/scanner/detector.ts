@@ -8,6 +8,7 @@ import { LineIndex } from "./lineIndex";
 import { ConsoleLogMatch, SourceRange } from "./types";
 
 const SUPPRESSION_DIRECTIVE = "console-log-janitor-ignore";
+const FILE_DISABLE_DIRECTIVE = "console-log-janitor-disable";
 
 function isIdentChar(ch: string): boolean {
   return (
@@ -27,10 +28,18 @@ export class Detector {
   private readonly source: string;
   private readonly lineIndex: LineIndex;
   private readonly suppressionLines = new Set<number>();
+  private isFileDisabled = false;
 
   constructor(source: string) {
     this.source = source;
     this.lineIndex = new LineIndex(source);
+  }
+
+  /**
+   * Returns whether the file is suppressed via a file-level directive.
+   */
+  public isFileSuppressed(): boolean {
+    return this.isFileDisabled;
   }
 
   /**
@@ -66,6 +75,9 @@ export class Detector {
     let prevTokenKind: "operator" | "keyword" | "operand" | "open" | "close" | "none" = "none";
 
     const checkSuppression = (text: string, startOffset: number) => {
+      if (text.includes(FILE_DISABLE_DIRECTIVE)) {
+        this.isFileDisabled = true;
+      }
       if (text.includes(SUPPRESSION_DIRECTIVE)) {
         const pos = this.lineIndex.positionAt(startOffset);
         this.suppressionLines.add(pos.line);
@@ -528,6 +540,10 @@ export class Detector {
       }
 
       i++;
+    }
+
+    if (this.isFileDisabled) {
+      return [];
     }
 
     // Secondary suppression check pass
